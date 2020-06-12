@@ -1,0 +1,488 @@
+-- Learnings commands for reference
+----------------
+
+x = ("apple", "banana", "cherry")
+y = list(x)
+print(y)
+
+y[1] = "kiwi"
+print(y)
+x = tuple(y)
+print(x)
+
+list1 = ["a","b"]
+print(list1)
+
+list1[1] = "c"
+print(list1)
+
+
+
+thisdict = {
+  "brand": "Ford",
+  "model": "Mustang",
+  "year": 1964
+}
+print(thisdict["year"])
+
+thisdict["year"] = "2020"
+thisdict["year"] = "2020"
+print(thisdict.get("year"))
+
+thisdict["name"] = "Sree"
+for x in thisdict:
+    print("The value for Key : "+ format(x)  +  " is: "  +  thisdict[x])
+
+
+
+
+- Get live exchange rate ,store is s3 and then open from s3 and load into redshift as table
+---------------------------
+
+import json
+import requests
+import boto3
+# Where USD is the base currency you want to use
+url = 'https://prime.exchangerate-api.com/v5/fd73b74d6b24cdd373057282/latest/GBP'
+#url = 'https://prime.exchangerate-api.com'
+
+#url = 'https://www.xe.com/currencytables/?from=GBP&date=2020-03-11'
+# Making our request
+response = requests.get(url)
+data = response.json()
+
+# Your JSON object
+print(data)
+
+s3 = boto3.resource('s3', aws_access_key_id='AKIAVLCNWMOT6UDR2WWB', aws_secret_access_key='V4RLbXYoS3ccK41gxe8Fk2smQ99X98X4LNZcGxwi')
+
+s3object = s3.Object('sda2020prod', 'XE2.json')
+
+s3object.put(
+    Body=(bytes(json.dumps(data).encode('UTF-8')))
+)
+#s3.Object('sda2020prod', 'XE.json').put(Body=open(data.dumps(), 'rb'))
+
+
+----------------------
+
+-- Execute by opening an sql file in s3 bucket
+
+
+import pymysql.cursors
+import smart_open
+import subprocess
+
+
+file = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalone.sql').read()
+
+rds_host = "orbitaloneprod.cmaqzrxfvrqn.eu-west-2.rds.amazonaws.com"
+user ="root"
+password ="adminadmin"
+db_name="OrbitalOne"
+
+print(file)
+
+connection = pymysql.connect(host=rds_host,user=user,password=password,db=db_name,charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor)
+cursor = connection.cursor()
+for line in file.split(';'):
+    cursor.execute(line)
+connection.close()
+
+
+----------------------
+
+
+
+--- WORKING - python script to open sql dump file from s3 and execute in rds 1
+
+import pymysql.cursors
+import smart_open
+import subprocess
+
+
+file = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalone.sql').read()
+
+rds_host = "orbitaloneprod.cmaqzrxfvrqn.eu-west-2.rds.amazonaws.com"
+user ="root"
+password ="adminadmin"
+db_name="OrbitalOne"
+
+print(file)
+
+connection = pymysql.connect(host=rds_host,user=user,password=password,db=db_name,charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor)
+cursor = connection.cursor()
+for line in file.split(';'):
+    cursor.execute(line)
+connection.close()
+
+-----------------------
+
+
+
+
+
+--- WORKING - python script to open sql dump file from s3 and execute in rds 2
+
+
+import pymysql.cursors
+import smart_open
+import subprocess
+
+
+rds_host = "orbitaloneprod.cmaqzrxfvrqn.eu-west-2.rds.amazonaws.com"
+user ="root"
+password ="adminadmin"
+db_name="OrbitalOne"
+
+connection = pymysql.connect(host=rds_host,user=user,password=password,db=db_name,charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor)
+cursor = connection.cursor()
+cursor.execute('SET FOREIGN_KEY_CHECKS=0')
+
+for line_data in smart_open.open('s3://sda2020prod/OrbitalOne/orbitalonedata.sql').read().split(';'):
+    cursor.execute(line_data)
+connection.close()
+
+-----------------------
+
+
+--- script to execute sql in redshift after import from s3
+
+import sqlalchemy as sa
+from sqlalchemy.orm import sessionmaker
+import psycopg2
+import smart_open
+print(smart_open.open('s3://sda2019poc/sfCrede.csv').read())
+file = smart_open.open('s3://sda2019poc/sfCrede.csv').read()
+print(file)
+con=psycopg2.connect("dbname=dev host=redshift-cluster-1.cpfeqwe82jkr.eu-west-2.redshift.amazonaws.com port=5439 user=redshift password=Masteruser123")
+#engine = sa.create_engine(con)
+#session = sessionmaker()
+#session.configure(bind=engine)
+#s=session()
+
+#sqlc = "select * from sdapoc.user"
+#s.execute(sqlc)
+
+cur = con.cursor()
+cur.execute("create schema myedw")
+cur.close()
+con.close()
+print("Database created")
+
+--------------
+
+
+import boto
+from boto.s3.key import Key
+  conn = boto.connect_s3('eu-west-2')
+  bucket = conn.get_bucket('sda2019poc')
+  k = Key(bucket)
+  k.key = 'sfCrede.csv'
+  k.open()
+  k.read(1000)
+
+----
+
+
+from awscli.customizations.s3.utils import split_s3_bucket_key
+import boto3
+client = boto3.client('s3')
+bucket_name, key_name = split_s3_bucket_key(
+    's3://sda2019poc/sfCrede.csv')
+response = client.get_object(Bucket=bucket_name, Key=key_name)
+
+--- to open a file using smart open
+
+import smart_open
+smart_open.open('s3://sda2019poc/sfCrede.csv').read()
+
+
+----------- Connect to mysql database
+
+#!/usr/bin/python
+import MySQLdb
+
+# Connect
+db = MySQLdb.connect(host="localhost",
+                     user="appuser",
+                     passwd="",
+                     db="onco")
+
+cursor = db.cursor()
+
+# Execute SQL select statement
+cursor.execute("SELECT * FROM location")
+
+# Commit your changes if writing
+# In this case, we are only reading data
+# db.commit()
+
+# Get the number of rows in the resultset
+numrows = cursor.rowcount
+
+# Get and display one row at a time
+for x in range(0, numrows):
+    row = cursor.fetchone()
+    print row[0], "-->", row[1]
+
+# Close the connection
+db.close()
+
+
+
+DEPENDENCIES ::::-----------
+
+pip  install boto3
+pip  install smart-open
+pip3 install psycopg2
+pip3 install psycopg2-binary 
+pip3 install sqlalchemy 
+pip3 install sqlalchemy-redshift
+pip install MySQL-python
+
+
+------------------- read from s3 and load into redshift
+
+#import MySQLdb
+import sqlalchemy as sa
+from sqlalchemy.orm import sessionmaker
+import psycopg2
+import smart_open
+print(smart_open.open('s3://sda2019poc/sfCrede.csv').read())
+file1 = smart_open.open('s3://sda2019poc/orbitalone.sql').read()
+file2 = smart_open.open('s3://sda2019poc/orbitalone-data.sql').read()
+#print(file)
+#con=psycopg2.connect("dbname=ootest host= orbitalone.csj4cqgd4wfb.eu-west-2.rds.amazonaws.com port=3306 user=admin password=adminadmin")
+con=psycopg2.connect("dbname=dev host=redshift-cluster-1.cpfeqwe82jkr.eu-west-2.redshift.amazonaws.com port=5439 user=redshift password=Masteruser123")
+#engine = sa.create_engine(con)
+#session = sessionmaker()
+#session.configure(bind=engine)
+#s=session()
+
+#sqlc = "select * from sdapoc.user"
+#s.execute(sqlc)
+
+cur = con.cursor()
+#cur.execute("create table if not exists sdapoc.myedw (id int)")
+#cur.execute("insert into sdapoc.myedw(id) values (11)")
+cur.execute(file1)
+cur.execute(file2)
+con.commit()
+cur.close()
+con.close()
+print("Database created")
+
+
+
+-------------------------- lambda fucntion to read from s3 and load into rds mysql
+
+
+
+import pymsql
+import sys
+import smart_open
+
+REGION = 'eu-west-2'
+
+rds_host = "orbitaloneprod.cmaqzrxfvrqn.eu-west-2.rds.amazonaws.com"
+name ="root"
+password ="adminadmin"
+db_name="OrbitalOne"
+
+file1 = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalone.sql').read()
+file2 = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalone-data.sql').read()
+
+def save_event(event):
+	
+
+--------------- python script to read from s3 and load into rds mysql
+
+import pymysql.cursors
+import smart_open
+import subprocess
+
+file1 = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalone.sql').read()
+#file2 = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalonedata.sql').read()
+rds_host = "orbitaloneprod.cmaqzrxfvrqn.eu-west-2.rds.amazonaws.com"
+user ="root"
+password ="adminadmin"
+db_name="OrbitalOne"
+
+connection = pymysql.connect(host=rds_host,user=user,password=password,db=db_name,charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor)
+
+try:
+    with connection.cursor() as cursor:
+        # Create a new record
+         sql = file1
+         cursor.execute(sql)
+    # connection is not autocommit by default. So you must commit to save
+    # your changes.
+    connection.commit()
+
+finally:
+    connection.close()
+
+
+
+------------------- import mysql dump --- 
+import pymsql
+import pexpect
+import smart_open
+import sys
+
+REGION = 'eu-west-2'
+rds_host = "orbitaloneprod.cmaqzrxfvrqn.eu-west-2.rds.amazonaws.com"
+name ="root"
+password ="adminadmin"
+db_name="OrbitalOne"
+
+file1 = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalone.sql').read()
+#file2 = smart_open.open('s3://sda2020prod/OrbitalOne/orbitalone-data.sql').read()
+command2 = 'mysqldump -h rds_host -u name -p password -B db_name'
+
+
+mysqlfile = file1
+with open(mysqlfile, "w+") as file:
+    p = pexpect.spawn(command2)
+    p.expect("Enter password: ")
+    p.sendline("foobar")
+    q = p.read()
+    p.wait()
+    file.write(q)
+
+
+--- Python code on Snowflake
+
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from py4j.java_gateway import java_import
+
+## @params: [JOB_NAME, URL, ACCOUNT, WAREHOUSE, DB, SCHEMA, USERNAME, PASSWORD]
+SNOWFLAKE_SOURCE_NAME = "net.snowflake.spark.snowflake"
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'URL', 'ACCOUNT', 'WAREHOUSE', 'DB', 'SCHEMA', 'USERNAME', 'PASSWORD'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+java_import(spark._jvm, SNOWFLAKE_SOURCE_NAME)
+## uj = sc._jvm.net.snowflake.spark.snowflake
+spark._jvm.net.snowflake.spark.snowflake.SnowflakeConnectorUtils.enablePushdownSession(spark._jvm.org.apache.spark.sql.SparkSession.builder().getOrCreate())
+sfOptions = {
+"sfURL" : args['URL'],
+"sfAccount" : args['ACCOUNT'],
+"sfUser" : args['USERNAME'],
+"sfPassword" : args['PASSWORD'],
+"sfDatabase" : args['DB'],
+"sfSchema" : args['SCHEMA'],
+"sfWarehouse" : args['WAREHOUSE'],
+}
+
+## Read from a Snowflake table into a Spark Data Frame
+df = spark.read.format(SNOWFLAKE_SOURCE_NAME).options(**sfOptions).option("dbtable", "[table_name]").load()
+
+## Perform any kind of transformations on your data and save as a new Data Frame: df1 = df.[Insert any filter, transformation, or other operation]
+## Write the Data Frame contents back to Snowflake in a new table df1.write.format(SNOWFLAKE_SOURCE_NAME).options(**sfOptions).option("dbtable", "[new_table_name]").mode("overwrite").save() job.commit()
+
+
+-------------------
+
+-- python code for salesforce fetch
+
+
+
+
+Python Script:
+-------------
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.dynamicframe import DynamicFrame
+from awsglue.job import Job
+
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+
+sparkContext = SparkContext()
+glueContext = GlueContext(sparkContext)
+sparkSession = glueContext.spark_session
+
+##Use the CData JDBC driver to read Salesforce data from the Account table into a DataFrame
+##Note the populated JDBC URL and driver class name
+source_df = sparkSession.read.format("jdbc").option("url","jdbc:salesforce:User="sreedevneela@silverdoorapartments.com.preprod";Password="Actian@123";Security Token="0ay33a6m9HV4Qjmq6DWshrdE";Use Sandbox="True";Login URL="";").option("dbtable","Account").option("driver","cdata.jdbc.salesforce.SalesforceDriver").load()
+
+glueJob = Job(glueContext)
+glueJob.init(args['JOB_NAME'], args)
+
+##Convert DataFrames to AWS Glue's DynamicFrames Object
+dynamic_dframe = DynamicFrame.fromDF(source_df, glueContext, "dynamic_df")
+
+##Write the DynamicFrame as a file in CSV format to a folder in an S3 bucket. 
+##It is possible to write to any Amazon data store (SQL Server, Redshift, etc) by using any previously defined connections.
+retDatasink4 = glueContext.write_dynamic_frame.from_options(frame = dynamic_dframe, connection_type = "s3", connection_options = {"path": "s3://sda2019poc/gluesfoutput"}, format = "csv", transformation_ctx = "datasink4")
+
+glueJob.commit()
+
+-------------------
+
+
+-------- Glue python job loading snowflake
+
+
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from py4j.java_gateway import java_import
+SNOWFLAKE_SOURCE_NAME = "net.snowflake.spark.snowflake"
+ 
+## @params: [JOB_NAME, URL, ACCOUNT, WAREHOUSE, DB, SCHEMA, USERNAME, PASSWORD]
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'URL', 'ACCOUNT', 'WAREHOUSE', 'DB', 'SCHEMA', 'USERNAME', 'PASSWORD'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+java_import(spark._jvm, "net.snowflake.spark.snowflake")
+ 
+## uj = sc._jvm.net.snowflake.spark.snowflake
+spark._jvm.net.snowflake.spark.snowflake.SnowflakeConnectorUtils.enablePushdownSession(spark._jvm.org.apache.spark.sql.SparkSession.builder().getOrCreate())
+sfOptions = {
+"sfURL" : args['URL'],
+"sfAccount" : args['ACCOUNT'],
+"sfUser" : args['USERNAME'],
+"sfPassword" : args['PASSWORD'],
+"sfDatabase" : args['DB'],
+"sfSchema" : args['SCHEMA'],
+"sfWarehouse" : args['WAREHOUSE'],
+}
+ 
+df = glueContext.create_dynamic_frame.from_catalog(database = "test", table_name = "02112019_csv", transformation_ctx = "df").toDF()
+ 
+df.write.format(SNOWFLAKE_SOURCE_NAME).options(**sfOptions).option("parallelism", "8").option("dbtable", "abcdef").mode("overwrite").save()
+ 
+job.commit()
+
+-----------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
